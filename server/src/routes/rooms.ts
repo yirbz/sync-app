@@ -1,0 +1,211 @@
+import { Router } from "express";
+import { db, schema } from "../db.js";
+import { authenticateJellyfinToken } from "../middleware/auth.js";
+import { eq, desc, and } from "drizzle-orm";
+
+export const roomsRouter = Router();
+
+roomsRouter.use(authenticateJellyfinToken);
+
+function generateInviteCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// GET /api/rooms — list rooms for current user
+roomsRouter.get("/", async (req, res) => {
+  const user = (req as any).user;
+
+  const userRooms = await db
+    .select()
+    .from(schema.participants)
+    .where(eq(schema.participants.userId, user.id))
+    .leftJoin(schema.rooms, eq(schema.participants.roomId, schema.rooms.id));
+
+  const rooms = userRooms.map((r) => r.rooms);
+
+  const roomData = await Promise.all(
+    rooms.map(async (room) => {
+      const count = await db
+        .select({ count: schema.participants.id })
+        .from(schema.participants)
+        .where(eq(schema.participants.roomId, room!.id));
+      return {
+        ...room,
+        participantCount: count.length,
+      };
+    })
+  );
+
+  res.json(roomData);
+});
+
+// POST /api/rooms — create a room
+roomsRouter.post("/", async (req, res) => {
+  const user = (req as any).user;
+  const { name, syncplayGroupId, itemIds } = req.body;
+
+  if (!name || !syncplayGroupId) {
+    return res.status(400).json({ error: "name y syncplayGroupId son requeridos" });
+  }
+
+  let inviteCode: string;
+  let exists = true;
+  do {
+    inviteCode = generateInviteCode();
+    const existing = await db
+      .select()
+      .from(schema.rooms)
+      .where(eq(schema.rooms.inviteCode, inviteCode));
+    exists = existing.length > 0;
+  } while (exists);
+
+  const [room] = await db
+    .insert(schema.rooms)
+    .values({
+      name,
+      syncplayGroupId,
+      createdBy: user.name,
+      createdByUserId: user.id,
+      inviteCode,
+      itemIds: itemIds || [],
+    })
+    .returning();
+
+  await db.insert(schema.participants).values({
+    roomId: room.id,
+    userId: user.id,
+    userName: user.name,
+  });
+
+  res.status(201).json({ ...room, participantCount: 1 });
+});
+
+// GET /api/rooms/join/:code — get room by invite code
+roomsRouter.get("/join/:code", async (req, res) => {
+  const { code } = req.params;
+
+  const [room] = await db
+    .select()
+    .from(schema.rooms)
+    .where(eq(schema.rooms.inviteCode, code.toUpperCase()));
+
+  if (!room) {
+    return res.status(404).json({ error: "Sala no encontrada" });
+  }
+
+  const count = await db
+    .select({ count: schema.participants.id })
+    .from(schema.participants)
+    .where(eq(schema.participants.roomId, room.id));
+
+  res.json({ ...room, participantCount: count.length });
+});
+
+// POST /api/rooms/:id/join — join a room
+roomsRouter.post("/:id/join", async (req, res) => {
+  const user = (req as any).user;
+  const { id } = req.params;
+
+  const [room] = await db
+    .select()
+    .from(schema.rooms)
+    .where(eq(schema.rooms.id, id));
+
+  if (!room) {
+    return res.status(404).json({ error: "Sala no encontrada" });
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.participants)
+    .where(
+      and(
+        eq(schema.participants.roomId, room.id),
+        eq(schema.participants.userId, user.id)
+      )
+    );
+
+  if (!existing) {
+    await db.insert(schema.participants).values({
+      roomId: room.id,
+      userId: user.id,
+      userName: user.name,
+    });
+  }
+
+  const count = await db
+    .select({ count: schema.participants.id })
+    .from(schema.participants)
+    .where(eq(schema.participants.roomId, room.id));
+
+  res.json({ ...room, participantCount: count.length });
+});
+
+// POST /api/rooms/:id/leave — leave a room
+roomsRouter.post("/:id/leave", async (req, res) => {
+  const user = (req as any).user;
+  const { id } = req.params;
+
+  await db
+    .delete(schema.participants)
+    .where(
+      and(
+        eq(schema.participants.roomId, id),
+        eq(schema.participants.userId, user.id)
+      )
+    );
+
+  const remaining = await db
+    .select({ count: schema.participants.id })
+    .from(schema.participants)
+    .where(eq(schema.participants.roomId, id));
+
+  if (remaining.length === 0) {
+    await db.delete(schema.rooms).where(eq(schema.rooms.id, id));
+  }
+
+  res.json({ success: true });
+});
+
+// GET /api/rooms/:id — get room detail
+roomsRouter.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const [room] = await db
+    .select()
+    .from(schema.rooms)
+    .where(eq(schema.rooms.id, id));
+
+  if (!room) {
+    return res.status(404).json({ error: "Sala no encontrada" });
+  }
+
+  const participants = await db
+    .select()
+    .from(schema.participants)
+    .where(eq(schema.participants.roomId, room.id));
+
+  res.json({ ...room, participants });
+});
+
+// PATCH /api/rooms/:id — update room status
+roomsRouter.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status, itemIds } = req.body;
+
+  const updates: Record<string, any> = { updatedAt: new Date() };
+  if (status) updates.status = status;
+  if (itemIds) updates.itemIds = itemIds;
+
+  const [room] = await db
+    .update(schema.rooms)
+    .set(updates)
+    .where(eq(schema.rooms.id, id))
+    .returning();
+
+  if (!room) {
+    return res.status(404).json({ error: "Sala no encontrada" });
+  }
+
+  res.json(room);
+});

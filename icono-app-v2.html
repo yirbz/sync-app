@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ícono — v2</title>
+<style>
+  :root{
+    --escarlata: #E5283B;
+    --escarlata-2: #B21030;
+    --rojo-profundo: #7A0C1B;
+    --carmesi-claro: #C11330;
+    --blanco-calido: #FFF8F6;
+    --carbon: #140A0C;
+    --carbon-2: #1F1113;
+    --coral: #FF6B7A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background:#FBF6F5;
+    padding: 40px 24px 70px;
+  }
+  .wrap{ max-width: 980px; margin:0 auto; }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:18px;
+    margin-bottom: 56px;
+  }
+  @media(max-width:760px){ .grid{grid-template-columns: repeat(2,1fr);} }
+
+  .card{
+    background:#fff;
+    border:1px solid #F0DEE0;
+    border-radius:18px;
+    padding:20px 16px 14px;
+    text-align:center;
+  }
+  .tile{
+    width:92px; height:92px;
+    margin:0 auto 12px;
+    border-radius:21px;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .tile svg{ width:60%; height:60%; }
+  .label{ font-size:11.5px; font-weight:600; color:#7A5A5D; margin:0; }
+
+  /* mark colors per tile */
+  .t-primary{ background: linear-gradient(155deg, var(--escarlata), var(--escarlata-2) 65%, var(--rojo-profundo)); }
+  .t-primary .dot{ fill:#fff; }
+  .t-primary .ring{ stroke:#fff; }
+
+  .t-dark{ background: linear-gradient(155deg, var(--carbon-2), var(--carbon)); border:1px solid #351A1D; }
+  .t-dark .dot{ fill:#FF4B5C; }
+  .t-dark .ring{ stroke:#FF4B5C; }
+
+  .t-light{ background: var(--blanco-calido); border:1px solid #F1D3D6; }
+  .t-light .dot{ fill:var(--carmesi-claro); }
+  .t-light .ring{ stroke:var(--carmesi-claro); }
+
+  .t-flat{ background: var(--escarlata); }
+  .t-flat .dot{ fill:#fff; }
+  .t-flat .ring{ display:none; }
+
+  .t-mono-b{ background:#fff; border:1px solid #E6E6E6; }
+  .t-mono-b .dot{ fill:#161616; }
+  .t-mono-b .ring{ stroke:#161616; }
+
+  .t-mono-w{ background:#161616; }
+  .t-mono-w .dot{ fill:#fff; }
+  .t-mono-w .ring{ stroke:#fff; }
+
+  .t-outline{ background:#fff; border:1.5px solid #E6E6E6; }
+  .t-outline .dot{ fill:none; stroke: var(--escarlata); stroke-width:6; }
+  .t-outline .ring{ stroke: var(--escarlata); }
+
+  .t-badge{ background: linear-gradient(155deg, var(--escarlata), var(--rojo-profundo)); }
+  .t-badge .dot{ fill:#fff; }
+  .t-badge .ring{ stroke:#fff; }
+  .badge-dot{
+    position:absolute; top:9px; right:9px;
+    width:11px; height:11px; border-radius:50%;
+    background: var(--coral);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.55);
+  }
+
+  /* palette */
+  .palette{
+    display:grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap:14px;
+  }
+  @media(max-width:760px){ .palette{grid-template-columns: repeat(3,1fr);} }
+  .swatch{ border-radius:12px; overflow:hidden; border:1px solid #F0DEE0; background:#fff; }
+  .swatch-color{ height:58px; }
+  .swatch-hex{ font-size:11px; text-align:center; padding:7px 4px; font-family:'SF Mono',Consolas,monospace; color:#6B565A; margin:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="grid">
+    <div class="card">
+      <div class="tile t-primary">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Principal</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-dark">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Modo oscuro</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-light">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Modo claro</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-flat">
+        <svg viewBox="0 0 100 100">
+          <circle class="dot" cx="50" cy="50" r="24"/>
+        </svg>
+      </div>
+      <p class="label">Plano / mínimo</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-mono-b">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Monocromo negro</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-mono-w">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Monocromo blanco</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-outline">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="6"/>
+          <circle class="dot" cx="38" cy="54" r="21" stroke-width="6"/>
+        </svg>
+      </div>
+      <p class="label">Línea / outline</p>
+    </div>
+
+    <div class="card">
+      <div class="tile t-badge">
+        <div class="badge-dot"></div>
+        <svg viewBox="0 0 100 100">
+          <circle class="ring" cx="62" cy="42" r="24" fill="none" stroke-width="7"/>
+          <circle class="dot" cx="38" cy="54" r="21"/>
+        </svg>
+      </div>
+      <p class="label">Con indicador vivo</p>
+    </div>
+  </div>
+
+  <div class="palette">
+    <div class="swatch"><div class="swatch-color" style="background:#E5283B;"></div><p class="swatch-hex">#E5283B</p></div>
+    <div class="swatch"><div class="swatch-color" style="background:#B21030;"></div><p class="swatch-hex">#B21030</p></div>
+    <div class="swatch"><div class="swatch-color" style="background:#7A0C1B;"></div><p class="swatch-hex">#7A0C1B</p></div>
+    <div class="swatch"><div class="swatch-color" style="background:#C11330;"></div><p class="swatch-hex">#C11330</p></div>
+    <div class="swatch"><div class="swatch-color" style="background:#FF6B7A;"></div><p class="swatch-hex">#FF6B7A</p></div>
+    <div class="swatch"><div class="swatch-color" style="background:#140A0C;"></div><p class="swatch-hex">#140A0C</p></div>
+  </div>
+
+</div>
+</body>
+</html>

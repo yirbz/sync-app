@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sync
+      POSTGRES_USER: sync
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sync_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sync"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      PORT: "3001"
+      DATABASE_URL: "postgres://sync:${DB_PASSWORD:-sync_password}@postgres:5432/sync"
+      JELLYFIN_URL: "${JELLYFIN_URL}"
+      CORS_ORIGIN: "${CORS_ORIGIN:-*}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  pgdata:
