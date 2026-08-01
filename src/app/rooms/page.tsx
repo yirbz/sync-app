@@ -87,14 +87,12 @@ function RoomsContent() {
     setCreateError("")
     try {
       const room = await createRoom(newName.trim(), [])
-      await loadRooms()
       setShowCreate(false)
       setNewName("")
       router.push(`/rooms/${room.id}`)
     } catch (err: unknown) {
       const errorObj = err as { message?: string }
-      setCreateError(errorObj?.message || "Error al crear la sala")
-    } finally {
+      setCreateError(errorObj?.message || "No se pudo crear la sala. Inténtalo de nuevo.")
       setCreating(false)
     }
   }
@@ -105,7 +103,6 @@ function RoomsContent() {
     try {
       const room = await joinRoomByInviteCode(inviteCode.trim().toUpperCase())
       if (room) {
-        await loadRooms()
         setShowJoin(false)
         setInviteCode("")
         router.push(`/rooms/${room.id}`)

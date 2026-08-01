@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
@@ -23,7 +23,26 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers })
+  // Timeout: abort after 12 seconds
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 12000)
+
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    })
+  } catch (err: any) {
+    clearTimeout(timeout)
+    if (err.name === "AbortError") {
+      throw new Error("La solicitud tardó demasiado. Verifica tu conexión a internet e inténtalo de nuevo.")
+    }
+    throw new Error("No se pudo conectar con el servidor. Verifica tu conexión a internet.")
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -38,11 +57,16 @@ async function request<T>(
       throw new Error("El servidor está teniendo una pausa breve de conexión. Inténtalo de nuevo en unos segundos.")
     }
 
-    const error = await res.json().catch(() => ({ error: null }))
-    throw new Error(error?.error || error?.message || `No se pudo completar la solicitud (${res.status})`)
+    let errorBody: any = null
+    try { errorBody = await res.json() } catch {}
+    throw new Error(errorBody?.error || errorBody?.message || `No se pudo completar la solicitud (${res.status})`)
   }
 
-  return res.json()
+  try {
+    return await res.json()
+  } catch {
+    throw new Error("El servidor respondió con datos inesperados. Inténtalo de nuevo.")
+  }
 }
 
 export interface RoomDTO {

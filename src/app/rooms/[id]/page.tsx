@@ -636,7 +636,7 @@ export default function RoomDetailPage() {
                 key={currentItem.contentId}
                 src={
                   currentItem.platform === "web"
-                    ? `${process.env.NEXT_PUBLIC_API_URL || "http://100.118.145.25:3001/api"}/web/stream?url=${encodeURIComponent(currentItem.contentId)}`
+                    ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/web/stream?url=${encodeURIComponent(currentItem.contentId)}`
                     : jellyfinStreamUrl!
                 }
                 className="w-full h-full object-contain bg-black"

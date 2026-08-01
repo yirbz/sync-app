@@ -109,15 +109,15 @@ export default function AppHomePage() {
     try {
       const room = await joinRoomByInviteCode(code)
       if (room) {
-        await loadData()
         setInviteCodeInput("")
         setShowJoinModal(false)
         router.push(`/rooms/${room.id}`)
       } else {
         setActionError("No se encontró ninguna sala con ese código")
       }
-    } catch {
-      setActionError("Error al unirse a la sala")
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      setActionError(errorObj?.message || "Error al unirse a la sala")
     } finally {
       setJoining(false)
     }

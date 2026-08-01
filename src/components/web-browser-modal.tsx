@@ -15,7 +15,7 @@ interface WebBrowserModalProps {
   inQueueUrls?: string[]
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://100.118.145.25:3001/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 const DEFAULT_HOMEPAGE = "https://www.google.com/search?q=videos+online&igu=1"
 
 function formatTargetUrl(input: string): string {

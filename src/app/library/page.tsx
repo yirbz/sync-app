@@ -12,7 +12,7 @@ import { Particles } from "@/components/magicui/particles"
 import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import {
   Search, Film, Monitor, Headphones, Loader2, ChevronLeft,
-  Tv, Play, Check, Copy, X, Link2
+  Tv, Play, Check, Copy, X, Link2, AlertCircle
 } from "lucide-react"
 
 function YoutubeIcon({ className }: { className?: string }) {
@@ -50,6 +50,7 @@ export default function LibraryPage() {
   // YouTube / Custom URL state
   const [customUrlInput, setCustomUrlInput] = useState("")
   const [launchingCustom, setLaunchingCustom] = useState(false)
+  const [roomError, setRoomError] = useState("")
 
   useEffect(() => {
     let isMounted = true
@@ -101,22 +102,30 @@ export default function LibraryPage() {
 
   const handleCreateRoomWithItem = async (item: LibraryItem) => {
     setCreatingRoom(true)
+    setRoomError("")
     try {
       const room = await createRoom(`Cine: ${item.name}`, [])
       setSelectedItem(null)
       router.push(`/rooms/${room.id}?mediaId=${item.id}`)
-    } catch {}
-    setCreatingRoom(false)
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      setRoomError(errorObj?.message || "No se pudo crear la sala. Inténtalo de nuevo.")
+      setCreatingRoom(false)
+    }
   }
 
   const handleLaunchCustomUrl = async (url: string) => {
     if (!url.trim()) return
     setLaunchingCustom(true)
+    setRoomError("")
     try {
       const room = await createRoom("Transmisión en Vivo", [])
       router.push(`/rooms/${room.id}?url=${encodeURIComponent(url.trim())}`)
-    } catch {}
-    setLaunchingCustom(false)
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      setRoomError(errorObj?.message || "No se pudo crear la sala. Inténtalo de nuevo.")
+      setLaunchingCustom(false)
+    }
   }
 
   const copyItemId = (id: string) => {
@@ -142,6 +151,19 @@ export default function LibraryPage() {
             </p>
           </div>
         </div>
+
+        {/* Room Error Alert */}
+        {roomError && (
+          <div className="flex items-center justify-between text-[13px] text-coral bg-coral/10 border border-coral/20 rounded-[14px] p-3 mb-4 relative z-10">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{roomError}</span>
+            </div>
+            <button type="button" onClick={() => setRoomError("")} className="text-coral hover:opacity-80">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Source Selector Tabs */}
         <div className="flex items-center gap-1 bg-carbon-2 p-1 rounded-full border border-white/10">

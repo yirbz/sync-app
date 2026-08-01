@@ -29,7 +29,7 @@ export function extractDriveFileId(input: string): string | null {
 export function getDriveDirectStreamUrl(fileIdOrUrl: string): string {
   const fileId = extractDriveFileId(fileIdOrUrl) || fileIdOrUrl
   const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://100.118.145.25:3001/api"
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
   return `${apiUrl}/web/stream?url=${encodeURIComponent(directUrl)}`
 }
 
