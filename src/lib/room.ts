@@ -79,17 +79,23 @@ function saveLocalRooms(rooms: Room[]) {
 }
 
 function dtoToRoom(dto: any): Room {
+  let createdAtMs = Date.now()
+  if (dto?.createdAt) {
+    const parsed = new Date(dto.createdAt).getTime()
+    if (!isNaN(parsed)) createdAtMs = parsed
+  }
+
   return {
     id: dto.id,
-    name: dto.name,
-    syncPlayGroupId: dto.syncplayGroupId,
+    name: dto.name || "Sala de Cine",
+    syncPlayGroupId: dto.syncplayGroupId || "",
     itemIds: dto.itemIds || [],
     currentItem: dto.currentItem || null,
-    createdBy: dto.createdBy,
-    createdByUserId: dto.createdByUserId,
-    controllerUserId: dto.controllerUserId || dto.createdByUserId,
-    createdAt: new Date(dto.createdAt).getTime(),
-    inviteCode: dto.inviteCode,
+    createdBy: dto.createdBy || "Usuario",
+    createdByUserId: dto.createdByUserId || "",
+    controllerUserId: dto.controllerUserId || dto.createdByUserId || "",
+    createdAt: createdAtMs,
+    inviteCode: dto.inviteCode || "",
     status: dto.status || "idle",
     participantCount: dto.participantCount || 0,
     participants: dto.participants || undefined,

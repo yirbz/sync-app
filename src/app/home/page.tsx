@@ -90,14 +90,12 @@ export default function AppHomePage() {
     setActionError("")
     try {
       const newRoom = await createRoom(name, [])
-      await loadData()
       setRoomNameInput("")
       setShowCreateModal(false)
       router.push(`/rooms/${newRoom.id}`)
     } catch (err: unknown) {
       const errorObj = err as { message?: string }
-      setActionError(errorObj?.message || "Error al crear la sala")
-    } finally {
+      setActionError(errorObj?.message || "Error al crear la sala. Inténtalo de nuevo.")
       setCreating(false)
     }
   }
