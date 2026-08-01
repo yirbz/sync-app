@@ -2,10 +2,12 @@ import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { AppShell } from "@/components/layout/app-shell"
 import { SwRegistration } from "@/components/layout/sw-registration"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { InitialLoadingScreen } from "@/components/ui/initial-loading-screen"
 
 export const metadata: Metadata = {
-  title: "Sync — Ver juntos",
-  description: "Sesiones de medios sincronizadas con amigos. Ve películas, series y streams en perfecta sincronía.",
+  title: "Sync — Cine en casa entre amigos",
+  description: "Sesiones de video sincronizadas con amigos. Ve películas, series y streams de YouTube y Jellyfin en perfecta sincronía.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -39,9 +41,11 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full antialiased">
       <body className="min-h-full bg-carbon text-blanco-calido font-sans flex flex-col">
+        <InitialLoadingScreen />
         <AppShell>
           {children}
         </AppShell>
+        <PwaInstallPrompt />
         <SwRegistration />
       </body>
     </html>

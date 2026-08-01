@@ -1,172 +1,399 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState, Suspense, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
+import {
+  createRoom, getMyRooms, joinRoomByInviteCode, deleteRoom,
+  updateRoomName, getInviteLink, type Room
+} from "@/lib/room"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Header } from "@/components/layout/header"
-import { Avatar } from "@/components/ui/avatar"
-import { useAuth } from "@/hooks/use-auth"
-import { createRoom, getMyRooms, joinRoomByInviteCode, syncRoomsWithServer, getInviteLink, type Room } from "@/lib/room"
-import { getLibraries, getItems, type LibraryFolder, type LibraryItem } from "@/lib/library"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Play, Users, Plus, Link, Copy, Check, X, Loader2, Share2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import {
+  Play, Users, Plus, X, Loader2, Share2, Check, Hash,
+  Search, MoreVertical, Trash2, Edit3, LogIn, Sparkles
+} from "lucide-react"
 
 export default function RoomsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-dvh flex items-center justify-center bg-carbon">
+          <Loader2 size={24} className="animate-spin text-dim" />
+        </div>
+      }
+    >
+      <RoomsContent />
+    </Suspense>
+  )
+}
+
+function RoomsContent() {
   const { session } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Modals state
   const [showCreate, setShowCreate] = useState(searchParams?.get("create") === "true")
   const [showJoin, setShowJoin] = useState(false)
-  const [newName, setNewName] = useState("")
-  const [inviteCode, setInviteCode] = useState("")
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [libraries, setLibraries] = useState<LibraryFolder[]>([])
-  const [selectedLibrary, setSelectedLibrary] = useState<string>("")
-  const [items, setItems] = useState<LibraryItem[]>([])
-  const [selectedItems, setSelectedItems] = useState<string[]>([])
-  const [creating, setCreating] = useState(false)
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null)
+  const [deletingRoom, setDeletingRoom] = useState<Room | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      try {
-        await syncRoomsWithServer()
-        setRooms(await getMyRooms())
-        const libs = await getLibraries()
-        setLibraries(libs)
-      } catch {}
-      setLoading(false)
-    }
-    load()
+  // Form inputs
+  const [newName, setNewName] = useState("")
+  const [editNameInput, setEditNameInput] = useState("")
+  const [inviteCode, setInviteCode] = useState("")
+
+  // Action states
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [createError, setCreateError] = useState("")
+  const [joinError, setJoinError] = useState("")
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
+
+  const loadRooms = useCallback(async () => {
+    try {
+      const data = await getMyRooms()
+      setRooms(data)
+    } catch {}
+    setLoading(false)
   }, [])
 
   useEffect(() => {
-    if (!selectedLibrary) return
-    getItems(selectedLibrary, { limit: 20 }).then((r) => setItems(r.items))
-  }, [selectedLibrary])
+    let mounted = true
+    getMyRooms().then((data) => {
+      if (mounted) {
+        setRooms(data)
+        setLoading(false)
+      }
+    }).catch(() => {
+      if (mounted) setLoading(false)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const handleCreate = async () => {
     if (!newName.trim() || !session) return
     setCreating(true)
+    setCreateError("")
     try {
-      const room = await createRoom(newName.trim(), selectedItems, session.userName)
-      setRooms(await getMyRooms())
+      const room = await createRoom(newName.trim(), [])
+      await loadRooms()
       setShowCreate(false)
       setNewName("")
-      setSelectedItems([])
       router.push(`/rooms/${room.id}`)
-    } catch (err: any) {
-      console.error("Error creating room:", err)
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      setCreateError(errorObj?.message || "Error al crear la sala")
+    } finally {
+      setCreating(false)
     }
-    setCreating(false)
   }
 
   const handleJoin = async () => {
     if (!inviteCode.trim()) return
+    setJoinError("")
     try {
       const room = await joinRoomByInviteCode(inviteCode.trim().toUpperCase())
       if (room) {
-        setRooms(await getMyRooms())
+        await loadRooms()
         setShowJoin(false)
         setInviteCode("")
         router.push(`/rooms/${room.id}`)
+      } else {
+        setJoinError("Código no válido o sala inactiva")
       }
-    } catch {}
+    } catch {
+      setJoinError("No se pudo encontrar la sala")
+    }
   }
 
-  const copyInviteLink = (room: Room) => {
-    const link = getInviteLink(room)
-    navigator.clipboard.writeText(link)
+  const handleEditRoomName = async () => {
+    if (!editingRoom || !editNameInput.trim()) return
+    setEditing(true)
+    try {
+      await updateRoomName(editingRoom.id, editNameInput.trim())
+      await loadRooms()
+      setEditingRoom(null)
+    } catch {}
+    setEditing(false)
+  }
+
+  const handleDeleteRoom = async () => {
+    if (!deletingRoom) return
+    setDeleting(true)
+    try {
+      await deleteRoom(deletingRoom.id)
+      await loadRooms()
+      setDeletingRoom(null)
+    } catch {}
+    setDeleting(false)
+  }
+
+  const copyInviteLink = (room: Room, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    navigator.clipboard.writeText(getInviteLink(room))
     setCopiedId(room.id)
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const toggleItem = (id: string) => {
-    setSelectedItems((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+  const filteredRooms = rooms.filter((r) => {
+    const q = searchQuery.toLowerCase().trim()
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.inviteCode.toLowerCase().includes(q) ||
+      r.createdBy.toLowerCase().includes(q)
     )
-  }
+  })
 
   return (
-    <div className="pt-[72px] px-4 pb-4">
-      <Header
-        title="Salas"
-        action={
+    <div className="flex flex-col min-h-dvh bg-carbon text-blanco-calido pt-[max(0.75rem,env(safe-area-inset-top))] pb-[calc(76px+env(safe-area-inset-bottom))] px-4">
+      {/* Header Bar */}
+      <div className="py-3 flex items-center justify-between border-b border-white/5 mb-4">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight text-blanco-calido">Inicio</h1>
+          <p className="text-[12px] text-dim">Tus salas y sesiones de cine en casa</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowJoin(true)}
+            className="px-3 py-1.5 rounded-full bg-carbon-3 border border-white/10 text-blanco-calido text-[12px] font-medium hover:bg-carbon-2 transition-colors flex items-center gap-1.5"
+          >
+            <LogIn size={14} className="text-coral" />
+            Unirse
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="px-3.5 py-1.5 rounded-full bg-escarlata text-blanco-calido text-[12px] font-semibold hover:bg-escarlata-2 shadow-fab transition-transform active:scale-95 flex items-center gap-1.5"
+          >
+            <Plus size={15} />
+            Crear
+          </button>
+        </div>
+      </div>
+
+      {/* Search Input */}
+      {rooms.length > 0 && (
+        <div className="relative mb-4">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dim" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por nombre o código..."
+            className="w-full rounded-[14px] bg-carbon-2/90 border border-white/5 pl-10 pr-3.5 py-2.5 text-[13px] text-blanco-calido placeholder-dim outline-none focus:border-escarlata/50 transition-colors"
+          />
+        </div>
+      )}
+
+      {/* Content Area */}
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-dim" />
+        </div>
+      ) : filteredRooms.length > 0 ? (
+        <div className="space-y-3 flex-1">
+          {filteredRooms.map((room) => {
+            const isMenuOpen = activeMenuId === room.id
+
+            return (
+              <div
+                key={room.id}
+                className="relative rounded-[18px] bg-carbon-2/80 border border-white/5 p-4 shadow-card hover:border-escarlata/30 transition-all group"
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div
+                    onClick={() => router.push(`/rooms/${room.id}`)}
+                    className="flex-1 min-w-0 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-[16px] font-semibold text-blanco-calido truncate group-hover:text-escarlata transition-colors">
+                        {room.name}
+                      </h3>
+                      <Badge variant={room.status === "playing" ? "coral" : "dim"} className="shrink-0">
+                        {room.status === "playing" ? "En vivo" : "Inactiva"}
+                      </Badge>
+                    </div>
+                    <p className="text-[12px] text-dim truncate">
+                      {room.currentItem ? room.currentItem.title : `Creada por ${room.createdBy}`}
+                    </p>
+                  </div>
+
+                  {/* Actions Dropdown Button */}
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveMenuId(isMenuOpen ? null : room.id)}
+                      className="w-8 h-8 rounded-full bg-carbon-3/80 flex items-center justify-center text-dim hover:text-blanco-calido hover:bg-carbon-3 transition-colors"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+
+                    {/* Popover Actions Menu */}
+                    {isMenuOpen && (
+                      <div className="absolute right-0 top-10 z-30 w-44 rounded-[14px] bg-carbon-3 border border-white/10 shadow-elevated p-1.5 animate-in fade-in slide-in-from-top-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null)
+                            copyInviteLink(room)
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[12px] text-blanco-calido hover:bg-carbon-2 transition-colors"
+                        >
+                          <Share2 size={14} className="text-coral" />
+                          Copiar invitación
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null)
+                            setEditingRoom(room)
+                            setEditNameInput(room.name)
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[12px] text-blanco-calido hover:bg-carbon-2 transition-colors"
+                        >
+                          <Edit3 size={14} className="text-muted" />
+                          Editar nombre
+                        </button>
+
+                        <div className="my-1 border-t border-white/5" />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null)
+                            setDeletingRoom(room)
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[12px] text-coral hover:bg-coral/10 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                          Eliminar sala
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Info & Enter Button */}
+                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-mono text-dim flex items-center gap-1 bg-carbon-3 px-2 py-1 rounded-[6px]">
+                      <Hash size={10} className="text-coral" /> {room.inviteCode}
+                    </span>
+                    <span className="text-[11px] text-muted flex items-center gap-1">
+                      <Users size={12} /> {room.participantCount}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => copyInviteLink(room, e)}
+                      className="px-2.5 py-1.5 rounded-[10px] bg-carbon-3 text-dim hover:text-blanco-calido text-[11px] font-medium transition-colors flex items-center gap-1"
+                    >
+                      {copiedId === room.id ? (
+                        <>
+                          <Check size={12} className="text-escarlata" /> Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Share2 size={12} /> Código
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/rooms/${room.id}`)}
+                      className="px-3 py-1.5 rounded-[10px] bg-escarlata text-blanco-calido text-[12px] font-semibold hover:bg-escarlata-2 transition-transform active:scale-95 flex items-center gap-1"
+                    >
+                      <Play size={13} fill="currentColor" /> Entrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
+          <div className="w-16 h-16 rounded-full bg-carbon-2 border border-white/5 flex items-center justify-center text-dim mb-3">
+            <Users size={28} />
+          </div>
+          <p className="text-[15px] font-semibold text-blanco-calido mb-1">
+            {searchQuery ? "Sin resultados para tu búsqueda" : "No tienes salas activas"}
+          </p>
+          <p className="text-[13px] text-dim mb-5 max-w-xs">
+            {searchQuery ? "Intenta con otro término o código" : "Crea una nueva sala o únete a una existente con un código"}
+          </p>
           <div className="flex gap-2">
-            <Button variant="icon" size="icon" onClick={() => setShowJoin(true)} title="Unirse a sala">
-              <Plus size={18} className="rotate-45" />
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Plus size={14} className="mr-1" /> Crear sala
             </Button>
-            <Button variant="icon" size="icon" onClick={() => setShowCreate(true)} title="Crear sala">
-              <Plus size={18} />
+            <Button size="sm" variant="secondary" onClick={() => setShowJoin(true)}>
+              <LogIn size={14} className="mr-1" /> Unirse
             </Button>
           </div>
-        }
-      />
+        </div>
+      )}
 
-      {/* Create room modal */}
+      {/* Modal: Create Room */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 bg-carbon/80 flex items-end sm:items-center justify-center">
-          <div className="bg-carbon-2 rounded-t-[20px] sm:rounded-[20px] w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-carbon-2 border-t sm:border border-white/10 rounded-t-[24px] sm:rounded-[24px] w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 animate-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[20px] font-[650] text-blanco-calido">Nueva sala</h2>
-              <button onClick={() => setShowCreate(false)} className="text-dim hover:text-blanco-calido">
-                <X size={20} />
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-escarlata" />
+                <h2 className="text-[18px] font-bold text-blanco-calido">Nueva sala</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowCreate(false); setCreateError(""); }}
+                className="w-8 h-8 rounded-full bg-carbon-3 flex items-center justify-center text-dim hover:text-blanco-calido"
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <Input label="Nombre de la sala" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej: Viernes de pelis" />
+            <Input
+              label="Nombre de la sala"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Ej. Películas del fin de semana"
+              autoFocus
+            />
 
-            <div className="mt-4">
-              <label className="text-[13px] font-medium text-muted block mb-2">Seleccionar biblioteca</label>
-              <div className="flex flex-wrap gap-2">
-                {libraries.map((lib) => (
-                  <button
-                    key={lib.id}
-                    onClick={() => setSelectedLibrary(lib.id === selectedLibrary ? "" : lib.id)}
-                    className={`px-3 py-1.5 rounded-[12px] text-[13px] font-medium transition-colors ${
-                      selectedLibrary === lib.id ? "bg-escarlata text-blanco-calido" : "bg-carbon-3 text-muted hover:text-blanco-calido"
-                    }`}
-                  >
-                    {lib.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {selectedLibrary && items.length > 0 && (
-              <div className="mt-3">
-                <label className="text-[13px] font-medium text-muted block mb-2">Seleccionar contenido ({selectedItems.length})</label>
-                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-                  {items.slice(0, 10).map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => toggleItem(item.id)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-[12px] text-left transition-colors ${
-                        selectedItems.includes(item.id) ? "bg-escarlata/15 border border-escarlata/30" : "bg-carbon-3 hover:bg-carbon-3/50"
-                      }`}
-                    >
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        selectedItems.includes(item.id) ? "border-escarlata bg-escarlata" : "border-dim"
-                      }`}>
-                        {selectedItems.includes(item.id) && <Check size={12} className="text-blanco-calido" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-blanco-calido truncate">{item.name}</p>
-                        <p className="text-[11px] text-dim">{item.year || ""}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            {createError && (
+              <div className="mt-3 text-[12px] text-coral bg-coral/10 rounded-[10px] px-3 py-2 font-medium">
+                {createError}
               </div>
             )}
 
             <div className="flex gap-2 mt-6">
-              <Button variant="secondary" className="flex-1" onClick={() => setShowCreate(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={handleCreate} disabled={creating || !newName.trim()}>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => { setShowCreate(false); setCreateError(""); }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleCreate}
+                disabled={creating || !newName.trim()}
+              >
                 {creating ? <Loader2 size={16} className="animate-spin" /> : "Crear sala"}
               </Button>
             </div>
@@ -174,65 +401,132 @@ export default function RoomsPage() {
         </div>
       )}
 
-      {/* Join room modal */}
+      {/* Modal: Join Room */}
       {showJoin && (
-        <div className="fixed inset-0 z-50 bg-carbon/80 flex items-end sm:items-center justify-center">
-          <div className="bg-carbon-2 rounded-t-[20px] sm:rounded-[20px] w-full max-w-md p-6">
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-carbon-2 border-t sm:border border-white/10 rounded-t-[24px] sm:rounded-[24px] w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 animate-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[20px] font-[650] text-blanco-calido">Unirse a sala</h2>
-              <button onClick={() => setShowJoin(false)} className="text-dim hover:text-blanco-calido">
-                <X size={20} />
+              <div className="flex items-center gap-2">
+                <LogIn size={18} className="text-coral" />
+                <h2 className="text-[18px] font-bold text-blanco-calido">Unirse a sala</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowJoin(false); setJoinError(""); }}
+                className="w-8 h-8 rounded-full bg-carbon-3 flex items-center justify-center text-dim hover:text-blanco-calido"
+              >
+                <X size={16} />
               </button>
             </div>
-            <Input label="Código de invitación" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="Ej: ABC123" maxLength={6} />
+
+            <Input
+              label="Código de invitación"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="Ej. SYNC12"
+              maxLength={10}
+              autoFocus
+            />
+
+            {joinError && (
+              <div className="mt-3 text-[12px] text-coral bg-coral/10 rounded-[10px] px-3 py-2 font-medium">
+                {joinError}
+              </div>
+            )}
+
             <div className="flex gap-2 mt-6">
-              <Button variant="secondary" className="flex-1" onClick={() => setShowJoin(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={handleJoin} disabled={inviteCode.trim().length < 4}>Unirse</Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => { setShowJoin(false); setJoinError(""); }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleJoin}
+                disabled={inviteCode.trim().length < 3}
+              >
+                Unirse
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Rooms list */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-dim" />
-        </div>
-      ) : rooms.length > 0 ? (
-        <div className="flex flex-col gap-3 mt-2">
-          {rooms.map((room) => (
-            <div key={room.id} onClick={() => router.push(`/rooms/${room.id}`)} className="cursor-pointer">
-              <Card className="flex items-center gap-4 hover:bg-carbon-3 transition-colors">
-                <Avatar name={room.name} size={48} />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-[17px] font-semibold leading-[1.25] text-blanco-calido truncate">{room.name}</h3>
-                  <p className="text-[13px] text-muted mt-0.5 truncate">{room.itemIds.length > 0 ? `${room.itemIds.length} items` : "Sin contenido"}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant={room.status === "playing" ? "coral" : "dim"}>
-                      {room.status === "playing" ? "● En vivo" : "Inactiva"}
-                    </Badge>
-                    <span className="text-[12px] text-dim">{room.participantCount} viendo</span>
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); copyInviteLink(room) }}
-                  className="shrink-0 w-10 h-10 rounded-full bg-carbon-3 flex items-center justify-center hover:bg-carbon-2 transition-colors"
-                  title="Copiar link de invitación"
-                >
-                  {copiedId === room.id ? <Check size={16} className="text-escarlata" /> : <Share2 size={16} className="text-dim" />}
-                </button>
-              </Card>
+      {/* Modal: Edit Room Name */}
+      {editingRoom && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-carbon-2 border-t sm:border border-white/10 rounded-t-[24px] sm:rounded-[24px] w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Edit3 size={18} className="text-escarlata" />
+                <h2 className="text-[18px] font-bold text-blanco-calido">Editar sala</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingRoom(null)}
+                className="w-8 h-8 rounded-full bg-carbon-3 flex items-center justify-center text-dim hover:text-blanco-calido"
+              >
+                <X size={16} />
+              </button>
             </div>
-          ))}
+
+            <Input
+              label="Nombre de la sala"
+              value={editNameInput}
+              onChange={(e) => setEditNameInput(e.target.value)}
+              placeholder="Nuevo nombre"
+              autoFocus
+            />
+
+            <div className="flex gap-2 mt-6">
+              <Button variant="secondary" className="flex-1" onClick={() => setEditingRoom(null)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleEditRoomName} disabled={editing || !editNameInput.trim()}>
+                {editing ? <Loader2 size={16} className="animate-spin" /> : "Guardar"}
+              </Button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Users size={40} className="text-dim mb-4" />
-          <p className="text-[15px] text-muted mb-1">No tienes salas aún</p>
-          <p className="text-[13px] text-dim mb-4">Crea una sala o únete con un código</p>
-          <div className="flex gap-3">
-            <Button onClick={() => setShowCreate(true)}>Crear sala</Button>
-            <Button variant="secondary" onClick={() => setShowJoin(true)}>Unirse</Button>
+      )}
+
+      {/* Modal: Delete Room Confirmation */}
+      {deletingRoom && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-carbon-2 border-t sm:border border-white/10 rounded-t-[24px] sm:rounded-[24px] w-full max-w-md p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-coral">
+                <Trash2 size={20} />
+                <h2 className="text-[18px] font-bold text-blanco-calido">Eliminar sala</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletingRoom(null)}
+                className="w-8 h-8 rounded-full bg-carbon-3 flex items-center justify-center text-dim hover:text-blanco-calido"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-[14px] text-muted leading-relaxed mb-6">
+              ¿Estás seguro de que deseas eliminar la sala{" "}
+              <span className="font-semibold text-blanco-calido">&quot;{deletingRoom.name}&quot;</span>? Esta acción eliminará el historial de mensajes y la sesión.
+            </p>
+
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setDeletingRoom(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-coral hover:bg-coral/90 text-blanco-calido"
+                onClick={handleDeleteRoom}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 size={16} className="animate-spin" /> : "Eliminar"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

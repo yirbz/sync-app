@@ -4,15 +4,15 @@ import { useEffect } from "react"
 
 export function SwRegistration() {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", async () => {
-        try {
-          await navigator.serviceWorker.register("/sw.js", { scope: "/" })
-        } catch {
-          // SW registration is non-critical
-        }
-      })
+    if (!("serviceWorker" in navigator)) return
+    const handler = () => {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {})
     }
+    if (document.readyState === "complete") {
+      handler()
+    }
+    window.addEventListener("load", handler)
+    return () => window.removeEventListener("load", handler)
   }, [])
 
   return null

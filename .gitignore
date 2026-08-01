@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# session logs & temporary screenshots
+session-*.md
+Screenshot*.png

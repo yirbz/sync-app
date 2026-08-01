@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 
-const PUBLIC_ROUTES = ["/auth"]
+const PUBLIC_ROUTES = ["/", "/auth"]
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -14,7 +14,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return
 
-    const isPublic = PUBLIC_ROUTES.some((r) => pathname.startsWith(r))
+    const isPublic = pathname === "/" || PUBLIC_ROUTES.some((r) => pathname.startsWith(r))
     const isJoin = pathname.startsWith("/rooms/join")
 
     if (!isAuthenticated && !isPublic && !isJoin) {
@@ -22,7 +22,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (isAuthenticated && pathname === "/auth") {
-      router.replace("/")
+      router.replace("/home")
     }
   }, [isAuthenticated, loading, pathname, router])
 

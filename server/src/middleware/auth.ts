@@ -7,13 +7,18 @@ export async function authenticateJellyfinToken(
   res: Response,
   next: NextFunction
 ) {
+  let token: string | undefined;
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Token requerido" });
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (req.query.token && typeof req.query.token === "string") {
+    token = req.query.token;
   }
 
-  const token = authHeader.slice(7);
+  if (!token) {
+    return res.status(401).json({ error: "Token requerido" });
+  }
 
   if (!JELLYFIN_URL) {
     return res.status(500).json({ error: "JELLYFIN_URL no configurado" });

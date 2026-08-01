@@ -1,3 +1,6 @@
+"use client"
+
+import React from "react"
 import { cn } from "@/lib/utils"
 
 type SyncIconVariant =
@@ -62,7 +65,7 @@ const variantStyles: Record<SyncIconVariant, { bg: string; dot: string; ring: st
 
 export function SyncIcon({
   variant = "primary",
-  size = 92,
+  size = 48,
   className,
   showBadge,
 }: SyncIconProps) {
@@ -71,7 +74,7 @@ export function SyncIcon({
   return (
     <div
       className={cn(
-        "relative inline-flex items-center justify-center rounded-[21px]",
+        "relative inline-flex items-center justify-center rounded-[22%] shrink-0 select-none overflow-hidden",
         styles.bg,
         className,
       )}
@@ -86,7 +89,7 @@ export function SyncIcon({
           cx="62"
           cy="42"
           r="24"
-          className={cn(styles.ring, variant !== "flat" && "")}
+          className={cn(styles.ring, variant === "flat" && "hidden")}
           strokeWidth={7}
           fill="none"
         />

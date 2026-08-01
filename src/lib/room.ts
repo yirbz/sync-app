@@ -1,4 +1,3 @@
-import { createSyncPlayGroup, joinSyncPlayGroup, leaveSyncPlayGroup, setSyncPlayQueue } from "./syncplay"
 import {
   apiGetRooms,
   apiCreateRoom,
@@ -6,19 +5,61 @@ import {
   apiJoinRoom,
   apiLeaveRoom,
   apiGetRoom,
+  apiDeleteRoom,
   apiUpdateRoom,
+  apiTransferControl,
+  apiGetMessages,
+  apiSendMessage,
+  apiGetQueue,
+  apiAddToQueue,
+  apiRemoveFromQueue,
+  apiUpdatePlayback,
 } from "./api"
+import type { ChatMessageDTO, QueueItemDTO, PlaybackStateDTO } from "./api"
 
 export interface Room {
   id: string
   name: string
   syncPlayGroupId: string
   itemIds: string[]
+  currentItem: { platform: string; id: string; title: string } | null
   createdBy: string
+  createdByUserId: string
+  controllerUserId: string
   createdAt: number
   inviteCode: string
   status: "idle" | "playing" | "paused"
   participantCount: number
+  participants?: { id: string; userId: string; userName: string }[]
+}
+
+export interface QueueItem {
+  id: string
+  platform: string
+  contentId: string
+  title: string
+  duration?: number
+  imageUrl?: string
+  addedBy: string
+  addedAt: string
+}
+
+export interface PlaybackState {
+  position: number
+  isPlaying: boolean
+  lastUpdated?: string
+}
+
+export interface ChatMessage {
+  id: string
+  roomId: string
+  userId: string
+  userName: string
+  content: string
+  replyToId?: string | null
+  replyToUserName?: string | null
+  replyToContent?: string | null
+  createdAt: string
 }
 
 const ROOMS_KEY = "sync_rooms"
@@ -37,66 +78,38 @@ function saveLocalRooms(rooms: Room[]) {
   localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms))
 }
 
-function generateInviteCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
-}
-
 function dtoToRoom(dto: any): Room {
   return {
     id: dto.id,
     name: dto.name,
     syncPlayGroupId: dto.syncplayGroupId,
     itemIds: dto.itemIds || [],
+    currentItem: dto.currentItem || null,
     createdBy: dto.createdBy,
+    createdByUserId: dto.createdByUserId,
+    controllerUserId: dto.controllerUserId || dto.createdByUserId,
     createdAt: new Date(dto.createdAt).getTime(),
     inviteCode: dto.inviteCode,
     status: dto.status || "idle",
     participantCount: dto.participantCount || 0,
+    participants: dto.participants || undefined,
   }
 }
 
-export async function createRoom(name: string, itemIds: string[], createdBy: string): Promise<Room> {
-  const syncPlayGroupId = await createSyncPlayGroup(name)
-  if (itemIds.length > 0) {
-    await setSyncPlayQueue(itemIds)
-  }
-
-  try {
-    const dto = await apiCreateRoom({ name, syncplayGroupId: syncPlayGroupId, itemIds })
-    return dtoToRoom(dto)
-  } catch {
-    const room: Room = {
-      id: crypto.randomUUID(),
-      name,
-      syncPlayGroupId,
-      itemIds,
-      createdBy,
-      createdAt: Date.now(),
-      inviteCode: generateInviteCode(),
-      status: "idle",
-      participantCount: 1,
-    }
-    const rooms = getLocalRooms()
-    rooms.unshift(room)
-    saveLocalRooms(rooms)
-    return room
-  }
+export async function createRoom(name: string, itemIds: string[]): Promise<Room> {
+  const dto = await apiCreateRoom({ name, itemIds })
+  return dtoToRoom(dto)
 }
 
 export async function joinRoomByInviteCode(inviteCode: string): Promise<Room | null> {
   try {
     const dto = await apiGetRoomByInviteCode(inviteCode)
-    await joinSyncPlayGroup(dto.syncplayGroupId)
     await apiJoinRoom(dto.id)
     return dtoToRoom(dto)
   } catch {
     const rooms = getLocalRooms()
     const room = rooms.find((r) => r.inviteCode === inviteCode)
-    if (!room) return null
-    await joinSyncPlayGroup(room.syncPlayGroupId)
-    room.participantCount += 1
-    saveLocalRooms(rooms)
-    return room
+    return room || null
   }
 }
 
@@ -106,12 +119,35 @@ export async function leaveRoom(roomId: string) {
   } catch {
     /* fallback */
   }
-  await leaveSyncPlayGroup()
   const rooms = getLocalRooms()
   const idx = rooms.findIndex((r) => r.id === roomId)
   if (idx !== -1) {
     rooms.splice(idx, 1)
     saveLocalRooms(rooms)
+  }
+}
+
+export async function deleteRoom(roomId: string): Promise<boolean> {
+  try {
+    await apiDeleteRoom(roomId)
+  } catch {
+    /* fallback */
+  }
+  const rooms = getLocalRooms()
+  const idx = rooms.findIndex((r) => r.id === roomId)
+  if (idx !== -1) {
+    rooms.splice(idx, 1)
+    saveLocalRooms(rooms)
+  }
+  return true
+}
+
+export async function updateRoomName(roomId: string, name: string): Promise<Room | null> {
+  try {
+    const dto = await apiUpdateRoom(roomId, { name })
+    return dtoToRoom(dto)
+  } catch {
+    return null
   }
 }
 
@@ -133,37 +169,93 @@ export async function getRoomById(roomId: string): Promise<Room | undefined> {
   }
 }
 
-export function getRoomByInviteCode(code: string): Room | undefined {
-  return getLocalRooms().find((r) => r.inviteCode === code)
-}
-
-export function getRoomBySyncPlayGroupId(groupId: string): Room | undefined {
-  return getLocalRooms().find((r) => r.syncPlayGroupId === groupId)
-}
-
 export function getInviteLink(room: Room): string {
   if (typeof window === "undefined") return ""
   return `${window.location.origin}/rooms/join?code=${room.inviteCode}`
 }
 
-export async function syncRoomsWithServer(): Promise<void> {
+export async function updateRoomContent(roomId: string, currentItem: { platform: string; id: string; title: string }) {
   try {
-    await apiGetRooms()
-  } catch {
-    /* server not available */
-  }
-}
-
-export async function updateRoomStatus(roomId: string, status: string) {
-  try {
-    await apiUpdateRoom(roomId, { status })
+    await apiUpdateRoom(roomId, { currentItem, status: "idle" })
   } catch {
     /* fallback */
   }
-  const rooms = getLocalRooms()
-  const room = rooms.find((r) => r.id === roomId)
-  if (room) {
-    room.status = status as Room["status"]
-    saveLocalRooms(rooms)
+}
+
+export async function getRoomMessages(roomId: string): Promise<ChatMessage[]> {
+  try {
+    const dtos: ChatMessageDTO[] = await apiGetMessages(roomId)
+    return dtos.map((d) => ({
+      id: d.id,
+      roomId: d.roomId,
+      userId: d.userId,
+      userName: d.userName,
+      content: d.content,
+      replyToId: d.replyToId,
+      replyToUserName: d.replyToUserName,
+      replyToContent: d.replyToContent,
+      createdAt: d.createdAt,
+    }))
+  } catch {
+    return []
   }
+}
+
+export async function sendRoomMessage(
+  roomId: string,
+  content: string,
+  replyTo?: { id: string; userName: string; content: string }
+): Promise<void> {
+  try {
+    await apiSendMessage(roomId, content, replyTo)
+  } catch {
+    /* fallback */
+  }
+}
+
+export async function getQueue(roomId: string): Promise<{ queue: QueueItem[]; currentIndex: number; playbackState: PlaybackState; currentItem: any }> {
+  const dto = await apiGetQueue(roomId)
+  return {
+    queue: (dto.queue || []).map((q: QueueItemDTO) => ({
+      id: q.id,
+      platform: q.platform,
+      contentId: q.contentId,
+      title: q.title,
+      duration: q.duration,
+      imageUrl: q.imageUrl,
+      addedBy: q.addedBy,
+      addedAt: q.addedAt,
+    })),
+    currentIndex: dto.currentIndex,
+    playbackState: dto.playbackState,
+    currentItem: dto.currentItem,
+  }
+}
+
+export async function addToQueue(roomId: string, item: { platform: string; contentId: string; title: string; duration?: number; imageUrl?: string }): Promise<void> {
+  try {
+    await apiAddToQueue(roomId, item)
+  } catch {
+    /* fallback */
+  }
+}
+
+export async function removeFromQueue(roomId: string, itemId: string): Promise<void> {
+  try {
+    await apiRemoveFromQueue(roomId, itemId)
+  } catch {
+    /* fallback */
+  }
+}
+
+export async function updatePlayback(roomId: string, state: { position?: number; isPlaying?: boolean; currentIndex?: number }): Promise<void> {
+  try {
+    await apiUpdatePlayback(roomId, state)
+  } catch {
+    /* fallback */
+  }
+}
+
+export async function transferControl(roomId: string, controllerUserId: string): Promise<void> {
+  await apiTransferControl(roomId, controllerUserId)
 }

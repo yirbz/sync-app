@@ -13,7 +13,8 @@ if [ -n "$DATABASE_URL" ]; then
 
   # Run migrations
   echo "Running database migrations..."
-  npx drizzle-kit push 2>&1 || echo "Migration step had issues, continuing..."
+  printf '{"dialect":"postgresql","schema":"./drizzle/schema.ts","out":"./drizzle/migrations","dbCredentials":{"url":"%s"}}\n' "$DATABASE_URL" > /tmp/drizzle.config.json
+  ./node_modules/.bin/drizzle-kit push --config=/tmp/drizzle.config.json 2>&1 || echo "Migration step had issues, continuing..."
 fi
 
 exec "$@"

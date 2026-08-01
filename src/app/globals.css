@@ -23,12 +23,28 @@
   --radius-xs: 8px;
 }
 
-body {
+html {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
   background: var(--color-carbon);
   color: var(--color-blanco-calido);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  background: var(--color-carbon);
+  color: var(--color-blanco-calido);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .shadow-card {

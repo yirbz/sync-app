@@ -24,6 +24,8 @@ services:
       PORT: "3001"
       DATABASE_URL: "postgres://sync:${DB_PASSWORD:-sync_password}@postgres:5432/sync"
       JELLYFIN_URL: "${JELLYFIN_URL}"
+      JELLYFIN_INTERNAL_URL: "${JELLYFIN_INTERNAL_URL:-http://jellyfin:8096}"
+      YOUTUBE_API_KEY: "${YOUTUBE_API_KEY}"
       CORS_ORIGIN: "${CORS_ORIGIN:-*}"
     depends_on:
       postgres:
@@ -35,6 +37,13 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    networks:
+      - default
+      - yvniel_jellyfin-net
 
 volumes:
   pgdata:
+
+networks:
+  yvniel_jellyfin-net:
+    external: true

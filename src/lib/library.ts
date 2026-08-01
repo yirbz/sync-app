@@ -95,7 +95,7 @@ function getUserId(): string {
   if (typeof window === "undefined") return ""
   try {
     const session = JSON.parse(localStorage.getItem("sync_session") || "{}")
-    return session.userId || ""
+    return session?.userId || ""
   } catch {
     return ""
   }

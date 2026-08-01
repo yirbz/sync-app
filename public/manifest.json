@@ -2,7 +2,7 @@
   "name": "Sync — Watch together",
   "short_name": "Sync",
   "description": "Synchronized media sessions with friends. Watch movies, shows, and streams in perfect sync.",
-  "start_url": "/?source=pwa",
+  "start_url": "/auth?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

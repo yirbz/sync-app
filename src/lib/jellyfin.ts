@@ -26,6 +26,11 @@ export function getApi(): Api | null {
   return apiInstance
 }
 
+export function getItemImageUrl(itemId: string, tag?: string): string {
+  if (!apiInstance || !tag) return ""
+  return `${apiInstance.basePath}/Items/${itemId}/Images/Primary?tag=${tag}&quality=90`
+}
+
 export async function login(serverUrl: string, username: string, password: string) {
   const api = createApi(serverUrl)
   const userApi = getUserApi(api)
