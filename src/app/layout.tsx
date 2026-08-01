@@ -6,9 +6,32 @@ import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 import { InitialLoadingScreen } from "@/components/ui/initial-loading-screen"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://sync-app.vercel.app"),
   title: "Sync — Cine en casa entre amigos",
-  description: "Sesiones de video sincronizadas con amigos. Ve películas, series y streams de YouTube y Jellyfin en perfecta sincronía.",
+  description: "Sesiones de video sincronizadas con amigos. Ve películas, series y streams de YouTube, Jellyfin y la web en perfecta sincronía.",
   manifest: "/manifest.json",
+  openGraph: {
+    title: "Sync — Cine en casa entre amigos",
+    description: "Sesiones de video sincronizadas con amigos. Ve películas, series y streams en perfecta sincronía.",
+    url: "https://sync-app.vercel.app",
+    siteName: "Sync",
+    locale: "es_ES",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Sync — Cine en casa entre amigos",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sync — Cine en casa entre amigos",
+    description: "Sesiones de video sincronizadas con amigos. Ve películas, series y streams en perfecta sincronía.",
+    images: ["/og-image.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
