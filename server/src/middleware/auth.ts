@@ -25,18 +25,23 @@ export async function authenticateJellyfinToken(
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
     const response = await fetch(
       `${JELLYFIN_URL}/Users/Me`,
       {
+        signal: controller.signal,
         headers: {
           Authorization: `MediaBrowser Token="${token}"`,
           "X-Emby-Authorization": `MediaBrowser Client="Sync API", Device="Sync API Server", DeviceId="sync-api", Version="1.0.0"`,
         },
       }
     );
+    clearTimeout(timeout);
 
     if (!response.ok) {
-      return res.status(401).json({ error: "Token inválido o expirado" });
+      return res.status(401).json({ error: "Tu sesión ha caducado. Inicia sesión de nuevo." });
     }
 
     const user = await response.json();
@@ -48,7 +53,10 @@ export async function authenticateJellyfinToken(
     };
 
     next();
-  } catch {
-    return res.status(401).json({ error: "Token inválido o expirado" });
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      return res.status(503).json({ error: "El servidor principal no responde en este momento. Inténtalo en un instante." });
+    }
+    return res.status(401).json({ error: "Tu sesión ha caducado. Inicia sesión de nuevo." });
   }
 }

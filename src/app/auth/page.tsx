@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { User, Lock, ArrowRight, Loader2, AlertCircle } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { SyncIcon } from "@/components/icons/sync-icon"
 import { RetroGrid } from "@/components/magicui/retro-grid"
@@ -17,9 +17,11 @@ const DEFAULT_SERVER_URL = process.env.NEXT_PUBLIC_JELLYFIN_URL || "https://sync
 export default function AuthPage() {
   const { signIn } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isExpired = searchParams?.get("expired") === "true"
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const [error, setError] = useState(isExpired ? "Tu sesión ha caducado por seguridad. Inicia sesión de nuevo para continuar." : "")
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {

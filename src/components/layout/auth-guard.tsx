@@ -12,6 +12,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    function handleExpired() {
+      router.replace("/auth?expired=true")
+    }
+
+    window.addEventListener("sync_session_expired", handleExpired)
+    return () => window.removeEventListener("sync_session_expired", handleExpired)
+  }, [router])
+
+  useEffect(() => {
     if (loading) return
 
     const isPublic = pathname === "/" || PUBLIC_ROUTES.some((r) => pathname.startsWith(r))

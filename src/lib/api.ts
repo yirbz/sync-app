@@ -26,8 +26,20 @@ async function request<T>(
   const res = await fetch(`${API_URL}${path}`, { ...options, headers })
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Error de conexión" }))
-    throw new Error(error.error || `Error ${res.status}`)
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("sync_session")
+        window.dispatchEvent(new CustomEvent("sync_session_expired"))
+      }
+      throw new Error("Tu sesión ha caducado. Por favor, inicia sesión de nuevo para continuar.")
+    }
+
+    if (res.status === 502 || res.status === 503) {
+      throw new Error("El servidor está teniendo una pausa breve de conexión. Inténtalo de nuevo en unos segundos.")
+    }
+
+    const error = await res.json().catch(() => ({ error: null }))
+    throw new Error(error?.error || error?.message || `No se pudo completar la solicitud (${res.status})`)
   }
 
   return res.json()
