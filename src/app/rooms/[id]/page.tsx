@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { detectMediaFromUrl } from "@/lib/media-detector"
 import { Button } from "@/components/ui/button"
 import { YouTubeBrowserModal } from "@/components/youtube-browser-modal"
 import { WebBrowserModal } from "@/components/web-browser-modal"
@@ -42,6 +43,8 @@ function formatTime(iso: string): string {
 export default function RoomDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const processedParamRef = useRef(false)
   const { session } = useAuth()
   const [room, setRoom] = useState<Room | null>(null)
   const [copied, setCopied] = useState(false)
@@ -223,6 +226,25 @@ export default function RoomDetailPage() {
   useEffect(() => { loadRoom() }, [loadRoom])
   useEffect(() => { loadMessages() }, [loadMessages])
   useEffect(() => { loadQueue() }, [loadQueue])
+
+  // Handle initial ?url= or ?mediaId= passed from Home or Library
+  useEffect(() => {
+    if (!room || !searchParams || processedParamRef.current) return
+    const urlParam = searchParams.get("url")
+    const mediaIdParam = searchParams.get("mediaId")
+
+    if (urlParam) {
+      processedParamRef.current = true
+      const detected = detectMediaFromUrl(urlParam)
+      const item = detected || { platform: "web", contentId: urlParam, title: "Video Web" }
+      handleAddToQueue(item)
+      router.replace(`/rooms/${room.id}`, { scroll: false })
+    } else if (mediaIdParam) {
+      processedParamRef.current = true
+      handleAddToQueue({ platform: "jellyfin", contentId: mediaIdParam, title: "Media Jellyfin" })
+      router.replace(`/rooms/${room.id}`, { scroll: false })
+    }
+  }, [room?.id, searchParams])
 
   // Real-time WebSocket sync
   useEffect(() => {

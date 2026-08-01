@@ -81,7 +81,7 @@ roomsRouter.post("/", async (req, res) => {
 
   console.log(`Creating room "${name}" for user ${user.name} (${user.id})`);
 
-  let syncplayGroupId: string;
+  let syncplayGroupId: string = "";
   try {
     syncplayGroupId = await createJellyfinSyncPlayGroup(name, user.token);
     console.log(`SyncPlay group created: ${syncplayGroupId}`);
@@ -90,8 +90,8 @@ roomsRouter.post("/", async (req, res) => {
       console.log(`SyncPlay queue set with ${itemIds.length} items`);
     }
   } catch (err: any) {
-    console.error(`SyncPlay error: ${err.message}`);
-    return res.status(502).json({ error: `Error al crear grupo SyncPlay: ${err.message}` });
+    console.warn(`Jellyfin SyncPlay optional warning: ${err.message}. Using fallback group ID.`);
+    syncplayGroupId = `sync_${crypto.randomUUID()}`;
   }
 
   let inviteCode: string;

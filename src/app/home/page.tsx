@@ -127,17 +127,23 @@ export default function AppHomePage() {
 
   const handleLaunchDirectUrl = async (e: React.FormEvent) => {
     e.preventDefault()
-    const url = directUrlInput.trim()
-    if (!url) return
+    const rawUrl = directUrlInput.trim()
+    if (!rawUrl) return
     setLaunchingUrl(true)
     setActionError("")
     try {
-      const name = `Transmisión: ${new URL(url).hostname || "En vivo"}`
+      const formattedUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+        ? rawUrl
+        : `https://${rawUrl}`
+      let hostname = "En vivo"
+      try { hostname = new URL(formattedUrl).hostname } catch {}
+      const name = `Transmisión: ${hostname}`
       const newRoom = await createRoom(name, [])
       setDirectUrlInput("")
-      router.push(`/rooms/${newRoom.id}?url=${encodeURIComponent(url)}`)
-    } catch {
-      setActionError("Ingresa una URL válida de video (MP4, HLS o YouTube)")
+      router.push(`/rooms/${newRoom.id}?url=${encodeURIComponent(formattedUrl)}`)
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      setActionError(errorObj?.message || "No se pudo crear la sala. Intenta de nuevo.")
     } finally {
       setLaunchingUrl(false)
     }
